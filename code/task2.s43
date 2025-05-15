@@ -1,0 +1,77 @@
+;*****************************************************************************
+; File: task2.s43 - Stack Parameter Access and Modulo Operation
+; Author: Asaf Kamber
+; Course: Introduction to Computers - Lab 2
+; Description: Implements a function that computes modulo 4 of each element
+;              in an array and stores results in another array.
+;              The function is called twice with different arrays.
+;*****************************************************************************
+#include <msp430xG46x.h>  ; Define controlled include file
+
+;-------------------------------------------------------------------------------
+; Data Section - Memory allocation for variables
+;-------------------------------------------------------------------------------
+         ORG 1100h         ; Start of data memory section
+id1      DW  0,8,4,8,8,9,7,3  ; First ID array (Aviv's ID)
+id2      DW  1,3,3,9,0,4,2,9  ; Second ID array (Asaf's ID)
+size     DW  8               ; Size of the ID arrays (8 elements)
+mod4_ID1 DS16 8              ; Array to store modulo 4 results for first ID (8 words)
+mod4_ID2 DS16 8              ; Array to store modulo 4 results for second ID (8 words)
+
+;-------------------------------------------------------------------------------
+; Stack Configuration
+;-------------------------------------------------------------------------------
+         RSEG  CSTACK        ; Segment for C stack
+         RSEG  CODE          ; Code segment in Flash memory
+
+;-------------------------------------------------------------------------------
+; Main Program
+;-------------------------------------------------------------------------------
+Main     MOV #SFE(CSTACK),SP  ; Initialize Stack Pointer to end of stack
+
+         ; First function call - compute mod4 for id1 array
+         PUSH #id1          ; Push address of first ID array
+         PUSH size          ; Push value of size directly (not address)
+         PUSH #mod4_ID1     ; Push address of result array
+         CALL #Func         ; Call the modulo 4 function
+         
+         ; Second function call - compute mod4 for id2 array
+         PUSH #id2          ; Push address of second ID array
+         PUSH size          ; Push value of size directly (not address)
+         PUSH #mod4_ID2     ; Push address of result array
+         CALL #Func         ; Call the modulo 4 function
+         
+L        JMP L              ; Infinite loop (program end)
+
+;-------------------------------------------------------------------------------
+; Function: Func - Compute modulo 4 for each element in an array
+; 
+; Parameters (passed on stack):
+;   - Address of result array (mod4_ID1 or mod4_ID2) [2(SP)]
+;   - Value of array size [4(SP)]
+;   - Address of source array (id1 or id2) [6(SP)]
+;
+; Returns:
+;   - Modulo 4 values stored in result array
+;-------------------------------------------------------------------------------
+Func     MOV 2(SP), R4      ; Load address of result array from stack
+         MOV 4(SP), R5      ; Load array size from stack
+         MOV 6(SP), R6      ; Load address of source array from stack
+         
+Loop     MOV @R6+,R7        ; Load value from source array, increment pointer
+         AND #3,R7          ; Compute modulo 4 by masking with 3 (binary 11)
+         MOV R7,0(R4)       ; Store result in result array
+         INCD R4            ; Increment result array pointer (2 bytes)
+         DEC R5             ; Decrement counter
+         JZ Finish          ; If counter is zero, finish
+         JMP Loop           ; Otherwise, continue loop
+         
+Finish   RET                ; Return to caller (return address on stack)
+
+;-------------------------------------------------------------------------------
+; Interrupt Vectors
+;-------------------------------------------------------------------------------
+         COMMON  INTVEC     ; Interrupt Vectors section
+         ORG     RESET_VECTOR  ; Power-On Reset vector
+         DW      Main       ; Set reset vector to point to the main program
+         END

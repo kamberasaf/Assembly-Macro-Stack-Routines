@@ -1,0 +1,81 @@
+;*****************************************************************************
+; File: pre2.s43 - Stack-based Function Implementation
+; Author: Asaf Kamber
+; Course: Introduction to Computers - Lab 2
+; Description: Demonstrates stack-based parameter passing and function calls
+;              to compute the XOR sum of two ID arrays.
+;*****************************************************************************
+#include <msp430xG46x.h>  ; Define controlled include file
+
+;-------------------------------------------------------------------------------
+; Data Section - Memory allocation for variables
+;-------------------------------------------------------------------------------
+         ORG 1100h         ; Start of data memory section
+avivID   DW  0,8,4,8,8,9,7,3  ; Aviv's ID digits stored as array of words
+asafID   DW  1,3,3,9,0,4,2,9  ; Asaf's ID digits stored as array of words
+IDsize   DW  8               ; Size of the ID arrays (8 elements)
+num      DW  0               ; Variable to store the result of XOR sum
+
+;-------------------------------------------------------------------------------
+; Stack Configuration
+;-------------------------------------------------------------------------------
+         RSEG  CSTACK        ; Segment for C stack
+         RSEG  CODE          ; Code segment in Flash memory
+
+;-------------------------------------------------------------------------------
+; Main Program
+;-------------------------------------------------------------------------------
+Main     MOV   #SFE(CSTACK),SP  ; Initialize Stack Pointer to end of stack
+
+         ; Push function arguments onto the stack (in reverse order)
+         PUSH  #avivID      ; Push address of first ID array
+         PUSH  #asafID      ; Push address of second ID array
+         PUSH  #IDsize      ; Push address of array size
+         PUSH  #num         ; Push address of result variable
+         
+         CALL  #Func        ; Call the XOR function
+         
+L        JMP   L            ; Infinite loop (program end)
+
+;-------------------------------------------------------------------------------
+; Function: Func - Compute XOR sum of two ID arrays
+; 
+; Parameters (passed on stack):
+;   - Address of first ID array (avivID)
+;   - Address of second ID array (asafID)
+;   - Address of array size (IDsize)
+;   - Address of result variable (num)
+;
+; Returns:
+;   - Result stored in 'num' variable
+;-------------------------------------------------------------------------------
+Func     POP   R4           ; Pop and save return address
+         POP   R5           ; Pop address of result variable (num)
+         POP   R6           ; Pop address of array size (IDsize)
+         POP   R7           ; Pop address of second ID array (asafID)
+         POP   R8           ; Pop address of first ID array (avivID)
+         
+         MOV   @R5,R5       ; Dereference num address to get value
+         MOV   @R6,R6       ; Dereference IDsize address to get size value
+         CLR   R11          ; Clear R11 (will hold the XOR sum)
+         
+L1       MOV   @R7,R9       ; Load value from second ID array
+         MOV   @R8,R10      ; Load value from first ID array
+         XOR   R9,R10       ; Compute XOR of the two values
+         ADD   R10,R11      ; Add result to running sum
+         INCD  R7           ; Increment second array pointer (2 bytes)
+         INCD  R8           ; Increment first array pointer (2 bytes)
+         MOV   R11,num      ; Store current sum in 'num' variable
+         DEC   R6           ; Decrement counter
+         JNZ   L1           ; If not zero, continue loop
+         
+         PUSH  R4           ; Push return address back to stack
+         RET                ; Return to caller
+
+;-------------------------------------------------------------------------------
+; Interrupt Vectors
+;-------------------------------------------------------------------------------
+         COMMON  INTVEC     ; Interrupt Vectors section
+         ORG     RESET_VECTOR  ; Power-On Reset vector
+         DW      Main       ; Set reset vector to point to the main program
+         END
